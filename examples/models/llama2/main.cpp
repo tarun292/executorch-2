@@ -74,5 +74,8 @@ int32_t main(int32_t argc, char** argv) {
   // generate
   runner.generate(prompt, seq_len);
 
+  printf("generating again!\n");
+  runner.generate(prompt, seq_len);
+  
   return 0;
 }
