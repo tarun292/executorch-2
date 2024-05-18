@@ -30,6 +30,7 @@
 #include <executorch/runtime/core/exec_aten/exec_aten.h>
 #include <executorch/runtime/core/exec_aten/util/scalar_type_util.h>
 #include <executorch/runtime/platform/log.h>
+#include <executorch/sdk/etdump/etdump_flatcc.h>
 
 namespace torch::executor {
 namespace {
@@ -44,7 +45,8 @@ Runner::Runner(
     const float temperature)
     : module_(std::make_unique<Module>(
           model_path,
-          Module::MlockConfig::UseMlockIgnoreErrors)),
+          Module::MlockConfig::UseMlockIgnoreErrors,
+          std::make_unique<ETDumpGen>())),
       tokenizer_path_(tokenizer_path),
       temperature_(temperature) {
   ET_LOG(
@@ -398,6 +400,18 @@ Error Runner::generate(
     ET_LOG(Info, "Sequence length (%i tokens) reached!", seq_len);
   }
 
+  auto etdump_result = static_cast<ETDumpGen*>(module_->event_tracer())->get_etdump_data();
+  if (etdump_result.buf != nullptr && etdump_result.size > 0) {
+    // On a device with a file system users can just write it out
+    // to the file-system.
+    printf("producing etdump!\n");
+    FILE* f = fopen("/Users/swolchok/etdump.bin", "w+");
+    fwrite((uint8_t*)etdump_result.buf, 1, etdump_result.size, f);
+    fclose(f);
+    free(etdump_result.buf);
+  } else {
+    printf("wtf no etdump\n");
+  }
   stats_.num_prompt_tokens = num_prompt_tokens;
   stats_.num_generated_tokens = pos - num_prompt_tokens;
   printReport(stats_);
